@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>歌词搜索下载器</title>
+    <script src="https://mirrors.sustech.edu.cn/cdnjs/ajax/libs/vue/3.5.17/vue.global.prod.js"></script>
+    <style>
+      /* CSS 变量定义，用于主题切换 */
+      :root {
+          --bg-color-body: #1a1a1a; --color-text: #e0e0e0; --bg-color-app: #2c2c2c; --bg-color-panel: #252525; --bg-color-input: #333; --border-color: #444; --border-color-light: #3a3a3a; --primary-color: #42b983; --primary-color-hover: #36a473; --bg-active: #42b983; --color-active-text: #fff; --bg-hover: #3c3c3c; --shadow-color: rgba(0, 0, 0, 0.4); --scrollbar-thumb-color: #555;
+      }
+      .light-theme {
+          --bg-color-body: #f0f2f5; --color-text: #333; --bg-color-app: #ffffff; --bg-color-panel: #fafafa; --bg-color-input: #fff; --border-color: #dcdfe6; --border-color-light: #e4e7ed; --primary-color: #409eff; --primary-color-hover: #3a8ee6; --bg-active: #409eff; --color-active-text: #fff; --bg-hover: #ecf5ff; --shadow-color: rgba(0, 0, 0, 0.1); --scrollbar-thumb-color: #ccc;
+      }
+      /* 基础样式 */
+      body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background-color: var(--bg-color-body); color: var(--color-text); transition: background-color 0.3s, color 0.3s; }
+      #app { max-width: 1200px; margin: 30px auto; padding: 25px; background-color: var(--bg-color-app); border-radius: 10px; box-shadow: 0 4px 12px var(--shadow-color); transition: background-color 0.3s; }
+      .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
+      h1 { color: var(--primary-color); margin: 0; }
+      .header-controls { display: flex; gap: 10px; }
+      .control-btn { padding: 8px 15px; border: 1px solid var(--border-color); background-color: transparent; color: var(--color-text); font-size: 14px; border-radius: 5px; cursor: pointer; transition: background-color 0.3s, border-color 0.3s; }
+      .control-btn:hover { background-color: var(--bg-hover); border-color: var(--primary-color); }
+      .search-container { display: flex; gap: 10px; margin-bottom: 30px; }
+      .search-container input { flex-grow: 1; padding: 12px 15px; border: 1px solid var(--border-color); background-color: var(--bg-color-input); color: var(--color-text); border-radius: 5px; font-size: 16px; outline: none; transition: border-color 0.3s, box-shadow 0.3s; }
+      .search-container input:focus { border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(66, 185, 131, 0.2); }
+      .search-container button { padding: 12px 20px; border: none; background-color: var(--primary-color); color: white; font-size: 16px; border-radius: 5px; cursor: pointer; transition: background-color 0.3s; }
+      .search-container button:hover { background-color: var(--primary-color-hover); }
+      .content-wrapper { display: flex; gap: 20px; border-top: 1px solid var(--border-color); padding-top: 20px; }
+      .panel { flex: 1; background-color: var(--bg-color-panel); padding: 20px; border-radius: 8px; min-height: 450px; display: flex; flex-direction: column; transition: background-color 0.3s; }
+      .panel h2 { margin-top: 0; color: var(--primary-color); border-bottom: 1px solid var(--border-color); padding-bottom: 10px; }
+      .song-list { list-style: none; padding: 0; margin: 0; overflow-y: auto; flex-grow: 1; max-height: 63vh; }
+      .song-list li { padding: 12px 15px; border-bottom: 1px solid var(--border-color-light); cursor: pointer; transition: background-color 0.2s; border-radius: 4px; }
+      .song-list li:hover { background-color: var(--bg-hover); }
+      .song-list li.active { background-color: var(--bg-active); color: var(--color-active-text); font-weight: bold; }
+      .lyric-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+      .lyric-header h3 { margin: 0; color: var(--color-text); }
+      .lyric-header button { padding: 8px 12px; font-size: 14px; background-color: #007bff; border: none; color: white; border-radius: 4px; cursor: pointer; transition: background-color 0.3s; }
+      .lyric-header button:hover { background-color: #0056b3; }
+      .lyric-header button:disabled { background-color: #555; cursor: not-allowed; opacity: 0.6; }
+      .lyric-content { flex-grow: 1; white-space: pre-wrap; word-wrap: break-word; max-height: 52vh; background-color: var(--bg-color-body); padding: 15px; border-radius: 5px; overflow-y: auto; color: var(--color-text); line-height: 1.7; font-size: 15px; transition: background-color 0.3s, color 0.3s; }
+      .status-message { text-align: center; color: #888; margin-top: 50px; font-size: 16px; }
+      ::-webkit-scrollbar { width: 8px; }
+      ::-webkit-scrollbar-track { background: var(--bg-color-app); }
+      ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb-color); border-radius: 6px; }
+    </style>
+</head>
+<body>
+
+<div id="app">
+  <div class="header">
+    <h1>歌词搜索下载器</h1>
+    <div class="header-controls">
+      <button class="control-btn" @click="setCookie">设置 Cookie</button>
+      <button class="control-btn" @click="toggleTheme">
+        切换为{{ theme === 'dark-theme' ? '白天' : '黑夜' }}模式
+      </button>
+    </div>
+  </div>
+
+  <!-- 搜索区域 -->
+  <div class="search-container">
+    <input type="text" v-model="searchQuery" @keydown.enter="searchSongs" placeholder="请输入歌曲名称...">
+    <button @click="searchSongs">搜索</button>
+  </div>
+
+  <!-- 内容展示区域 -->
+  <div class="content-wrapper">
+    <!-- 左侧：歌曲列表 -->
+    <div class="panel">
+      <h2>搜索结果</h2>
+      <ul class="song-list" v-if="songs.length > 0">
+        <li v-for="song in songs" :key="song.id" :class="{ active: currentSong && currentSong.id === song.id }"
+          @click="fetchLyric(song)">
+          {{ song.name }}
+        </li>
+      </ul>
+      <div v-else class="status-message">
+        {{ searchMessage }}
+      </div>
+    </div>
+
+    <!-- 右侧：歌词详情 -->
+    <div class="panel">
+      <h2>歌词详情</h2>
+      <div v-if="currentSong">
+        <div class="lyric-header">
+          <h3>{{ currentSong.name }}</h3>
+          <button @click="downloadLyric" :disabled="!lyricContent || lyricContent.includes('加载中')">下载歌词 (.lrc)</button>
+        </div>
+        <pre class="lyric-content">{{ lyricContent }}</pre>
+      </div>
+      <div v-else class="status-message">
+        请从左侧选择一首歌曲查看歌词
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const { createApp } = Vue;
+  const baseUrl = '.'
+
+  createApp({
+    // 选项式 API: data
+    data() {
+      return {
+        theme: localStorage.getItem('music-app-theme') || 'light-theme', // 'dark-theme' or 'light-theme'
+        searchQuery: '',
+        songs: [],
+        currentSong: null,
+        lyricContent: '',
+        isLoading: false,
+        searchMessage: '输入歌名，开始搜索吧！'
+      };
+    },
+    created() {
+      document.body.classList.toggle('light-theme', this.theme === 'light-theme');
+    },
+    methods: {
+      toggleTheme() {
+        this.theme = this.theme === 'dark-theme' ? 'light-theme' : 'dark-theme';
+        localStorage.setItem('music-app-theme', this.theme);
+        document.body.classList.toggle('light-theme', this.theme === 'light-theme');
+      },
+      async setCookie() {
+        const cookieValue = prompt("请输入您的 Cookie 内容：");
+        if (cookieValue === null || cookieValue.trim() === '') {
+          return;
+        }
+        try {
+          const response = await fetch(`${baseUrl}/cookie?c=${encodeURIComponent(cookieValue.trim())}`);
+          if (!response.ok) {
+            throw new Error(`服务器响应错误: ${response.status}`);
+          }
+          // 假设接口成功会返回一个可解析的 json
+          const result = await response.json();
+          console.log('设置Cookie成功:', result);
+          alert('Cookie 设置成功！');
+        } catch (error) {
+          console.error("设置 Cookie 失败:", error);
+          alert(`Cookie 设置失败，请检查网络或后端服务。\n错误信息: ${error.message}`);
+        }
+      },
+      // 方法：搜索歌曲
+      async searchSongs() {
+        if (!this.searchQuery.trim()) {
+          alert('请输入歌曲名称！');
+          return;
+        }
+        this.isLoading = true;
+        this.songs = [];
+        this.currentSong = null;
+        this.lyricContent = '';
+        this.searchMessage = '正在努力搜索中...';
+        try {
+          const response = await fetch(`${baseUrl}/songs?name=${encodeURIComponent(this.searchQuery)}`);
+          if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+          const result = await response.json();
+          this.songs = result.data || [];
+          this.searchMessage = this.songs.length === 0 ? '未找到相关歌曲，换个关键词试试？' : '';
+        } catch (error) {
+          console.error("搜索歌曲失败:", error);
+          this.searchMessage = '搜索失败，请检查网络或后端服务。';
+          alert('搜索失败，请检查控制台获取更多信息。');
+        } finally {
+          this.isLoading = false;
+        }
+      },
+      // 方法：获取歌词
+      async fetchLyric(song) {
+        if (this.currentSong && this.currentSong.id === song.id) return;
+        this.currentSong = song;
+        this.lyricContent = '歌词加载中...';
+        try {
+          const response = await fetch(`${baseUrl}/lyric?id=${song.id}`);
+          if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+          const result = await response.json();
+          this.lyricContent = result.lrc || '暂无歌词';
+        } catch (error) {
+          console.error("获取歌词失败:", error);
+          this.lyricContent = '歌词加载失败，请重试。';
+          alert('获取歌词失败，请检查控制台获取更多信息。');
+        }
+      },
+      // 方法：下载歌词文件
+      downloadLyric() {
+        if (!this.lyricContent || !this.currentSong || this.lyricContent.includes('加载中')) {
+          alert('没有歌词内容可以下载。');
+          return;
+        }
+        const blob = new Blob([this.lyricContent], { type: 'text/plain;charset=utf-8' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `${this.currentSong.name}.lrc`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href);
+      }
+    }
+  }).mount('#app');
+</script>
+</body>
+
+</html>
