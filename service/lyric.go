@@ -2,10 +2,15 @@ package service
 
 import (
 	"dlrc/utils"
+	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
+	"net/http/cookiejar"
+	"net/url"
 	"strings"
+	"time"
 
 	"github.com/PuerkitoBio/goquery" // 引入 goquery 库
 )
@@ -17,6 +22,7 @@ type SongInfo struct {
 }
 
 var Cookie string
+var CurrDate string
 
 func HandleCookie(w http.ResponseWriter, r *http.Request) {
 	utils.Cors(w, r)
@@ -27,6 +33,8 @@ func HandleCookie(w http.ResponseWriter, r *http.Request) {
 
 func HandleSongs(w http.ResponseWriter, r *http.Request) {
 	utils.Cors(w, r)
+	// InitCookie()
+
 	name := utils.GetParam(r, "name", "n")
 	if name == "" {
 		utils.FailMsg(w, "请传入歌曲名称参数: name")
@@ -43,6 +51,7 @@ func HandleSongs(w http.ResponseWriter, r *http.Request) {
 
 func HandleLyric(w http.ResponseWriter, r *http.Request) {
 	utils.Cors(w, r)
+	// InitCookie()
 
 	id := utils.GetParam(r, "id")
 	if id == "" {
@@ -57,6 +66,8 @@ func HandleLyric(w http.ResponseWriter, r *http.Request) {
 	}
 	req.Header.Set("Host", "www.2t58.com")
 	req.Header.Set("Referer", "http://www.2t58.com/song/"+id+".html")
+	req.Header.Set("Accept", "application/json, text/javascript, */*; q=0.01")
+	req.Header.Set("Accept-Language", "zh-CN,zh;q=0.9")
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.5845.97 Safari/537.36 Core/1.116.508.400 QQBrowser/19.1.6429.400")
 	if Cookie != "" {
 		req.Header.Set("Cookie", Cookie)
@@ -79,17 +90,33 @@ func HandleLyric(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	contentType := resp.Header.Get("Content-Type")
-	if contentType != "" {
-		w.Header().Set("Content-Type", contentType)
-	} else {
-		w.Header().Set("Content-Type", "application/json")
+	// contentType := resp.Header.Get("Content-Type")
+	// if contentType != "" {
+	// 	w.Header().Set("Content-Type", contentType)
+	// } else {
+	// 	w.Header().Set("Content-Type", "application/json")
+	// }
+
+	// _, err = io.Copy(w, resp.Body)
+	// if err != nil {
+	// 	fmt.Printf("写入前端响应时出错: %v\n", err)
+	// }
+	body, err := io.ReadAll(resp.Body)
+	var payload map[string]interface{}
+	err = json.Unmarshal(body, &payload)
+	if err != nil {
+		log.Printf("Error unmarshalling JSON: %s", string(body))
+		http.Error(w, "Invalid JSON format", http.StatusBadRequest)
+		return
 	}
 
-	_, err = io.Copy(w, resp.Body)
-	if err != nil {
-		fmt.Printf("写入前端响应时出错: %v\n", err)
+	lrc, ok := payload["lrc"]
+	if !ok {
+		http.Error(w, "'data' field not found in JSON payload", http.StatusBadRequest)
+		return
 	}
+
+	utils.Ok(w, lrc)
 }
 
 // GetTop10SongsFromURL 函数发送 HTTP GET 请求到指定的 URL，
@@ -100,7 +127,10 @@ func GetTop10SongsFromURL(url string, max int) ([]SongInfo, error) {
 		return nil, fmt.Errorf("发送 HTTP 请求失败: %w", err)
 	}
 	req.Header.Set("Host", "www.2t58.com")
-	req.Header.Set("Referer", url)
+	req.Header.Set("Referer", "http://www.2t58.com/")
+	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7")
+	req.Header.Set("Accept-Language", "zh-CN,zh;q=0.9")
+	req.Header.Set("Upgrade-Insecure-Requests", "1")
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.5845.97 Safari/537.36 Core/1.116.508.400 QQBrowser/19.1.6429.400")
 	if Cookie != "" {
 		req.Header.Set("Cookie", Cookie)
@@ -161,6 +191,68 @@ func GetTop10SongsFromURL(url string, max int) ([]SongInfo, error) {
 	})
 
 	return songs, nil
+}
+
+func InitCookie() {
+	if Cookie != "" && CurrDate == time.Now().Format("2006-01-02") {
+		fmt.Println("使用缓存的 Cookie:")
+		return
+	}
+	CurrDate = time.Now().Format("2006-01-02")
+
+	jar, err := cookiejar.New(nil) // nil 使用默认选项
+	if err != nil {
+		log.Fatalf("创建 CookieJar 失败: %v", err)
+	}
+
+	client := &http.Client{Jar: jar}
+	targetUrl := "http://www.2t58.com" // 替换为实际的 URL
+
+	fmt.Printf("正在执行第一个请求，获取 Cookie: %s\n", targetUrl)
+
+	req, err := http.NewRequest("GET", targetUrl, nil)
+	if err != nil {
+		log.Fatalf("创建第一个请求失败: %v", err)
+	}
+
+	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7")
+	req.Header.Set("Accept-Language", "zh-CN,zh;q=0.9")
+	req.Header.Set("Host", "www.2t58.com")
+	req.Header.Set("Referer", "http://www.2t58.com/")
+	req.Header.Set("Upgrade-Insecure-Requests", "1")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.5845.97 Safari/537.36 Core/1.116.508.400 QQBrowser/19.1.6429.400")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Fatalf("执行第一个请求失败: %v", err)
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Printf("读取第一个响应体失败: %v", err)
+	} else {
+		fmt.Printf("第一个请求响应体:\n%d\n", len(bodyBytes))
+	}
+
+	fmt.Println("响应头中的 Set-Cookie:")
+	cookies := ""
+	// for _, cookie := range resp.Cookies() {
+	// 	cookies += cookie.Name + "=" + cookie.Value + ";"
+	// 	fmt.Printf("  - %s=%s; Domain=%s; Path=%s\n", cookie.Name, cookie.Value, cookie.Domain, cookie.Path)
+	// }
+	u, _ := url.Parse("http://.2t58.com")
+	cookiesForDomain := jar.Cookies(u)
+	for _, cookie := range cookiesForDomain {
+		cookies += cookie.Name + "=" + cookie.Value + ";"
+		fmt.Printf("  - %s=%s; Domain=%s; Path=%s; Expires=%s\n", cookie.Name, cookie.Value, cookie.Domain, cookie.Path, cookie.Expires)
+	}
+	// 去掉最后一个;
+	if len(cookies) > 0 {
+		Cookie = cookies[:len(cookies)-1] // 截断最后一个字符
+	}
+	fmt.Println("Init Cookie:", CurrDate, Cookie)
+
 }
 
 // func main() {

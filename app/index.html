@@ -14,6 +14,7 @@
           --bg-color-body: #f0f2f5; --color-text: #333; --bg-color-app: #ffffff; --bg-color-panel: #fafafa; --bg-color-input: #fff; --border-color: #dcdfe6; --border-color-light: #e4e7ed; --primary-color: #409eff; --primary-color-hover: #3a8ee6; --bg-active: #409eff; --color-active-text: #fff; --bg-hover: #ecf5ff; --shadow-color: rgba(0, 0, 0, 0.1); --scrollbar-thumb-color: #ccc;
       }
       /* 基础样式 */
+      .line1 { text-overflow: ellipsis; white-space: nowrap; overflow: hidden; }
       body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background-color: var(--bg-color-body); color: var(--color-text); transition: background-color 0.3s, color 0.3s; }
       #app { max-width: 1200px; margin: 30px auto; padding: 25px; background-color: var(--bg-color-app); border-radius: 10px; box-shadow: 0 4px 12px var(--shadow-color); transition: background-color 0.3s; }
       .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
@@ -34,7 +35,7 @@
       .song-list li:hover { background-color: var(--bg-hover); }
       .song-list li.active { background-color: var(--bg-active); color: var(--color-active-text); font-weight: bold; }
       .lyric-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-      .lyric-header h3 { margin: 0; color: var(--color-text); }
+      .lyric-header h3 { margin: 0; color: var(--color-text); flex: 1; width: 0; }
       .lyric-header button { padding: 8px 12px; font-size: 14px; background-color: #007bff; border: none; color: white; border-radius: 4px; cursor: pointer; transition: background-color 0.3s; }
       .lyric-header button:hover { background-color: #0056b3; }
       .lyric-header button:disabled { background-color: #555; cursor: not-allowed; opacity: 0.6; }
@@ -85,7 +86,7 @@
       <h2>歌词详情</h2>
       <div v-if="currentSong">
         <div class="lyric-header">
-          <h3>{{ currentSong.name }}</h3>
+          <h3 class="line1">{{ currentSong.name }}</h3>
           <button @click="downloadLyric" :disabled="!lyricContent || lyricContent.includes('加载中')">下载歌词 (.lrc)</button>
         </div>
         <pre class="lyric-content">{{ lyricContent }}</pre>
@@ -176,7 +177,7 @@
           const response = await fetch(`${baseUrl}/lyric?id=${song.id}`);
           if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
           const result = await response.json();
-          this.lyricContent = result.lrc || '暂无歌词';
+          this.lyricContent = result.data || '暂无歌词';
         } catch (error) {
           console.error("获取歌词失败:", error);
           this.lyricContent = '歌词加载失败，请重试。';
