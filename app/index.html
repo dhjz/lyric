@@ -73,7 +73,7 @@
       <ul class="song-list" v-if="songs.length > 0">
         <li v-for="song in songs" :key="song.id" :class="{ active: currentSong && currentSong.id === song.id }"
           @click="fetchLyric(song)">
-          {{ song.name }}
+          {{ song.name }}{{ song.interval ? (' [' + formatTime(song.interval) + ']') : '' }}
         </li>
       </ul>
       <div v-else class="status-message">
@@ -155,10 +155,13 @@
         this.lyricContent = '';
         this.searchMessage = '正在努力搜索中...';
         try {
-          const response = await fetch(`${baseUrl}/songs?name=${encodeURIComponent(this.searchQuery)}`);
+          const response = await fetch(`${baseUrl}/qqsongs?name=${encodeURIComponent(this.searchQuery)}`);
           if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
           const result = await response.json();
-          this.songs = result.data || [];
+          this.songs = (result.data || []).map(x => ({
+            ...x,
+            name: `${x.singer ? (x.singer + ' - ') : ''}${x.name}`
+          }));
           this.searchMessage = this.songs.length === 0 ? '未找到相关歌曲，换个关键词试试？' : '';
         } catch (error) {
           console.error("搜索歌曲失败:", error);
@@ -174,10 +177,10 @@
         this.currentSong = song;
         this.lyricContent = '歌词加载中...';
         try {
-          const response = await fetch(`${baseUrl}/lyric?id=${song.id}`);
+          const response = await fetch(`${baseUrl}/qqlyric?id=${song.id}`);
           if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
           const result = await response.json();
-          this.lyricContent = result.data || '暂无歌词';
+          this.lyricContent = result.data.lyric || result.data || '暂无歌词';
         } catch (error) {
           console.error("获取歌词失败:", error);
           this.lyricContent = '歌词加载失败，请重试。';
@@ -198,6 +201,11 @@
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(link.href);
+      },
+      formatTime(time) {
+        const minutes = Math.floor(time / 60);
+        const seconds = Math.floor(time % 60);
+        return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
       }
     }
   }).mount('#app');
