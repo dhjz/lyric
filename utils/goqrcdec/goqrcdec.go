@@ -11,7 +11,7 @@ import (
 )
 
 // qrcKey used for 3DES decryption
-const qrcKey = "!@#)(*$%123ZXC!@!@#)(NHL"
+const qrcKey = "!@#)(*$%123" + "ZXC!@!@#)(NHL"
 
 // --- Bit‐manipulation helpers ---
 
