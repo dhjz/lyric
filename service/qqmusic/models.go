@@ -1,6 +1,8 @@
 // /qqmusic/models.go
 package qqmusic
 
+import "encoding/json"
+
 // SearchTypeEnum 模拟 C# 的枚举
 type SearchType int
 
@@ -88,4 +90,15 @@ type LyricResult struct {
 // ResultVo 简单的泛型结果包装
 type ResultVo[T any] struct {
 	Data T
+}
+
+func LyricFromJson(lyric string) LyricResult {
+	var lyricResult LyricResult
+	json.Unmarshal([]byte(lyric), &lyricResult)
+	return lyricResult
+}
+
+func LyricToJson(lyric *LyricResult) string {
+	json, _ := json.Marshal(lyric)
+	return string(json)
 }

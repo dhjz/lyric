@@ -11,7 +11,7 @@ go env -w GOOS=linux GOARCH=arm64  GOARM=
 go build -ldflags "-s -w" -o ./dist/dlrc
 echo "build linux-arm64 success..."
 go env -w GOOS=windows GOARCH=amd64 GOARM=
-@REM go build -o ./dist/dhttpc_debug.exe
+go build -o ./dist/dlrc_debug.exe
 go build -ldflags "-s -w -H=windowsgui" -o ./dist/
 echo "build windows exe success..."
 

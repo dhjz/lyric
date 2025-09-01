@@ -2,7 +2,7 @@
 package qqmusic
 
 import (
-	"dlrc/service/goqrcdec"
+	"dlrc/utils/goqrcdec"
 	"encoding/hex"
 )
 

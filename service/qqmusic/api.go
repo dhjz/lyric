@@ -2,6 +2,7 @@
 package qqmusic
 
 import (
+	"dlrc/dao"
 	"dlrc/service/base"
 	"dlrc/utils"
 	"encoding/json"
@@ -60,6 +61,21 @@ func HandleSongs(w http.ResponseWriter, r *http.Request) {
 
 func HandleLyric(w http.ResponseWriter, r *http.Request) {
 	utils.Cors(w, r)
+	id := utils.GetParam(r, "id")
+	name := utils.GetParam(r, "name")
+	if id == "" {
+		utils.FailMsg(w, "请传入歌曲ID参数: id")
+		return
+	}
+	lyric := dao.GetLyric(id, 1)
+	if lyric != nil && lyric.Lyric != nil {
+		fmt.Println("QQ HandleLyric from db id", id, lyric.Name)
+		var result LyricResult
+		dao.Decompress(lyric.Lyric, &result)
+		result.Code = 99
+		utils.Ok(w, result)
+		return
+	}
 	result, err := QQApi.GetLyric(utils.GetParam(r, "id"))
 	if err != nil {
 		utils.Fail(w)
@@ -68,6 +84,7 @@ func HandleLyric(w http.ResponseWriter, r *http.Request) {
 	result.Lyric = FormatLyric(result.Lyric)
 	result.Trans = FormatLyric(result.Trans)
 	result.Roma = FormatLyric(result.Roma)
+	dao.SaveLyric(id, dao.Compress(result), name, 1)
 	utils.Ok(w, result)
 }
 
@@ -218,7 +235,7 @@ func (q *QQMusicNativeApi) GetLyric(songID string) (*LyricResult, error) {
 	}
 	// log.Printf("GetLyric  songID %s: %v", songID, foundElements)
 
-	result := &LyricResult{Code: 0}
+	result := &LyricResult{}
 
 	for key, text := range foundElements {
 		if strings.TrimSpace(text) == "" {
